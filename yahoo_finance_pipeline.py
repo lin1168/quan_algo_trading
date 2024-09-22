@@ -46,15 +46,7 @@ cleaned_data = data_cleaned.loc[:date_end]
 print("Cleaned Data:")
 print(cleaned_data.head())
 
-<<<<<<< HEAD
-# Save train and test data 
-train_data.to_csv('train_data.csv')
-test_data.to_csv('test_data.csv')
-=======
 # Save train and test data
 cleaned_data.to_csv('cleaned_data.csv')
 
 cleaned_data.head()
-
-
->>>>>>> 2f8ffe4 (Changed my data timeframe and change my rsi strat to add stop loss and position based sizing)

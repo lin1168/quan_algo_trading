@@ -89,6 +89,14 @@ time_in_market = len(cleaned_data[(cleaned_data['Signal'] == 'Buy') | (cleaned_d
 daily_returns = pd.Series(equity_curve).pct_change().dropna()
 sharpe_ratio = np.sqrt(252) * daily_returns.mean() / daily_returns.std()
 
+# Calculate the buy-and-hold strategy's equity curve
+initial_price = cleaned_data['Adj Close'].iloc[0]  # The price on the first day
+cleaned_data['Buy_and_Hold'] = initial_cash * (cleaned_data['Adj Close'] / initial_price)
+
+# Plot all three charts (Price, RSI, and Equity Curves) with the Buy-and-Hold strategy
+fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)  # 3 rows, 1 column
+
+
 # Display performance metrics
 metrics = {
     'Final Equity': final_equity,
@@ -104,17 +112,46 @@ metrics = {
 for key, value in metrics.items():
     print(f"{key}: {value:.2f}")
 
-# Plot equity curve with y-axis formatted to show large numbers
-plt.figure(figsize=(10, 6))
-plt.plot(cleaned_data['Date'], cleaned_data['Equity'], label='Equity Curve')
+buy_signals_plot = cleaned_data[cleaned_data['Signal'] == 'Buy']
+sell_signals_plot = cleaned_data[cleaned_data['Signal'] == 'Sell']
 
-# Format y-axis to show in dollar amounts
-ax = plt.gca()  # Get the current axis
-ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'${x:,.0f}'))  # Format as dollars
+# Plot all three charts (Price, RSI, and Equity Curves) with the Buy-and-Hold strategy
+fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)  # 3 rows, 1 column
 
-plt.xlabel('Date')
-plt.ylabel('Equity (in dollars)')
-plt.title('Equity Curve')
-plt.legend()
+# 1. Price chart with buy and sell signals
+axs[0].plot(cleaned_data['Date'], cleaned_data['Adj Close'], label='SPY Price', color='blue')
+axs[0].scatter(buy_signals_plot['Date'], buy_signals_plot['Adj Close'], marker='^', color='green', label='Buy Signal', alpha=1)
+axs[0].scatter(sell_signals_plot['Date'], sell_signals_plot['Adj Close'], marker='v', color='red', label='Sell Signal', alpha=1)
+axs[0].set_ylabel('Price (Adj Close)')
+axs[0].set_title('Price Chart with Buy and Sell Signals')
+axs[0].legend()
+
+# 2. RSI chart (without buy and sell signals)
+axs[1].plot(cleaned_data['Date'], cleaned_data['RSI_2'], label='RSI(2)', color='blue')
+axs[1].axhline(15, color='green', linestyle='--', alpha=0.7)
+axs[1].axhline(85, color='red', linestyle='--', alpha=0.7)
+axs[1].set_ylabel('RSI(2)')
+axs[1].set_title('RSI(2)')
+axs[1].legend()
+
+# 3. Equity curve comparison: RSI strategy vs. buy-and-hold
+axs[2].plot(cleaned_data['Date'], cleaned_data['Equity'], label='RSI Strategy Equity Curve', color='blue')
+axs[2].plot(cleaned_data['Date'], cleaned_data['Buy_and_Hold'], label='Buy-and-Hold Strategy', color='orange')
+
+# Format y-axis as dollar amounts
+axs[2].yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'${x:,.0f}'))
+axs[2].set_ylabel('Equity (in dollars)')
+axs[2].set_title('Equity Curve Comparison: RSI Strategy vs Buy-and-Hold SPY')
+axs[2].legend()
+
+# Set common labels
+axs[2].set_xlabel('Date')
+
+# Auto-adjust layout
+plt.tight_layout()
+
+# Save the figure as a PDF (ensure this happens before plt.show())
+plt.savefig('RSI_strategy_comparison.pdf', format='pdf')
+
+# Display the plot (plt.show() comes after savefig)
 plt.show()
-
