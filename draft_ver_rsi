@@ -1,0 +1,155 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+# TRADE SIGNALS 
+# BUY WHEN: The 2-day RSI crosses below 10. (at the close)
+# SELL WHEN: The 2-day RSI crosses above 80 (at the close)
+
+# Load data
+train_data = pd.read_csv('train_data.csv', index_col='Date', parse_dates=True)
+test_data = pd.read_csv('test_data.csv', index_col='Date', parse_dates=True)
+
+# Calculate 2-day RSI
+def calculate_rsi(data, window=2):
+    delta = data['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=window).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=window).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    data['RSI'] = rsi
+    return data
+
+# Generate buy/sell signals
+def generate_signals(data):
+    data['Signal'] = 0
+    data.loc[data['RSI'] < 10, 'Signal'] = 1  # Buy signal
+    data.loc[data['RSI'] > 80, 'Signal'] = -1  # Sell signal
+    return data
+
+# Backtest strategy with total trades and returns
+def backtest_strategy(data, initial_balance=10000):
+    balance = initial_balance
+    position = 0
+    total_trades = 0
+    equity_curve = []
+    trades = []
+    entry_price = None
+    
+    for i, row in data.iterrows():
+        if row['Signal'] == 1 and position == 0:  # Buy
+            entry_price = row['Close']
+            position = balance / row['Close']
+            balance = 0
+            total_trades += 1  # Count the trade
+        elif row['Signal'] == -1 and position > 0:  # Sell
+            balance = position * row['Close']
+            trades.append(row['Close'] - entry_price)  # Track trade outcome
+            position = 0
+            entry_price = None
+        
+        total_balance = balance + (position * row['Close'])
+        equity_curve.append(total_balance)
+    
+    data['Equity'] = equity_curve
+    total_returns = (equity_curve[-1] - initial_balance) / initial_balance
+    return data, trades, total_trades, total_returns
+
+# Calculate expectancy and expected profit
+def calculate_expectancy(trades):
+    winning_trades = np.array([trade for trade in trades if trade > 0])
+    losing_trades = np.array([trade for trade in trades if trade < 0])
+    
+    p_win = len(winning_trades) / len(trades) if len(trades) > 0 else 0
+    p_loss = len(losing_trades) / len(trades) if len(trades) > 0 else 0
+    
+    avg_profit = winning_trades.mean() if len(winning_trades) > 0 else 0
+    avg_loss = losing_trades.mean() if len(losing_trades) > 0 else 0
+    
+    expectancy = (avg_profit * p_win) + (avg_loss * p_loss)
+    expected_profit = expectancy * len(trades)
+    
+    return expectancy, expected_profit
+
+# Calculate performance metrics
+def calculate_performance_metrics(data):
+    data['Returns'] = data['Equity'].pct_change()
+    sharpe_ratio = np.sqrt(252) * data['Returns'].mean() / data['Returns'].std()
+    drawdown = data['Equity'] / data['Equity'].cummax() - 1
+    max_drawdown = drawdown.min()
+    return sharpe_ratio, max_drawdown
+
+# Plot equity curve, RSI, and trade signals, save the plot
+def plot_equity_curve(data, title, filename=None):
+    fig, ax = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
+
+    # Plot the closing price and trade signals
+    ax[0].plot(data.index, data['Close'], label='Close Price')
+    ax[0].scatter(data.index[data['Signal'] == 1], data['Close'][data['Signal'] == 1], label='Buy Signal', marker='^', color='g')
+    ax[0].scatter(data.index[data['Signal'] == -1], data['Close'][data['Signal'] == -1], label='Sell Signal', marker='v', color='r')
+    ax[0].set_title(f'{title} - Price and Trade Signals')
+    ax[0].legend()
+
+    # Plot the RSI indicator and trade signals
+    ax[1].plot(data.index, data['RSI'], label='RSI', color='blue')
+    ax[1].scatter(data.index[data['Signal'] == 1], data['RSI'][data['Signal'] == 1], label='Buy Signal (RSI)', marker='^', color='g')
+    ax[1].scatter(data.index[data['Signal'] == -1], data['RSI'][data['Signal'] == -1], label='Sell Signal (RSI)', marker='v', color='r')
+    ax[1].axhline(10, linestyle='--', color='green', label='Buy Threshold (RSI < 10)')
+    ax[1].axhline(80, linestyle='--', color='red', label='Sell Threshold (RSI > 80)')
+    ax[1].set_title('RSI Indicator with Buy/Sell Signals')
+    ax[1].legend()
+
+    # Plot the equity curve
+    ax[2].plot(data.index, data['Equity'], label='Equity Curve', color='green')
+    ax[2].scatter(data.index[data['Signal'] == 1], data['Equity'][data['Signal'] == 1], label='Buy Signal', marker='^', color='g', s=100)
+    ax[2].scatter(data.index[data['Signal'] == -1], data['Equity'][data['Signal'] == -1], label='Sell Signal', marker='v', color='r', s=100)
+    ax[2].set_title('Equity Curve with Trade Signals')
+    ax[2].legend()
+
+    plt.suptitle(title)  # Set the overall title for the plot
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Adjust layout to include the overall title
+    
+    if filename:
+        plt.savefig(filename)  # Save the plot if a filename is provided
+
+    plt.show()
+
+# Function to format the output into a table
+def print_results(train_sharpe, train_max_drawdown, train_total_trades, train_total_returns, train_expectancy, train_expected_profit, 
+                  test_sharpe, test_max_drawdown, test_total_trades, test_total_returns, test_expectancy, test_expected_profit):
+    
+    results = {
+        'Metric': ['Sharpe Ratio', 'Max Drawdown', 'Total Trades', 'Total Returns', 'Expectancy', 'Expected Profit'],
+        'Training Data': [train_sharpe, train_max_drawdown, train_total_trades, train_total_returns, train_expectancy, train_expected_profit],
+        'Testing Data': [test_sharpe, test_max_drawdown, test_total_trades, test_total_returns, test_expectancy, test_expected_profit]
+    }
+
+    df = pd.DataFrame(results)
+    print(df)
+
+# Apply RSI calculation, signal generation, and backtest for training data
+train_data = calculate_rsi(train_data)
+train_data = generate_signals(train_data)
+train_data, train_trades, train_total_trades, train_total_returns = backtest_strategy(train_data)
+
+# Apply RSI calculation, signal generation, and backtest for testing data
+test_data = calculate_rsi(test_data)
+test_data = generate_signals(test_data)
+test_data, test_trades, test_total_trades, test_total_returns = backtest_strategy(test_data)
+
+# Calculate performance metrics for both train and test data
+train_sharpe, train_max_drawdown = calculate_performance_metrics(train_data)
+test_sharpe, test_max_drawdown = calculate_performance_metrics(test_data)
+
+# Calculate expectancy and expected profit
+train_expectancy, train_expected_profit = calculate_expectancy(train_trades)
+test_expectancy, test_expected_profit = calculate_expectancy(test_trades)
+
+# Print the results in table format
+print_results(train_sharpe, train_max_drawdown, train_total_trades, train_total_returns, train_expectancy, train_expected_profit,
+              test_sharpe, test_max_drawdown, test_total_trades, test_total_returns, test_expectancy, test_expected_profit)
+
+# Call the plotting functions with titles and filenames for saving
+plot_equity_curve(train_data, 'Training Data - RSI Strategy', filename='training_rsi_backtest_plot.png')
+plot_equity_curve(test_data, 'Testing Data - RSI Strategy', filename='testing_rsi_backtest_plot..png')
+
