@@ -33,7 +33,8 @@ data_cleaned['Date'] = pd.to_datetime(data_cleaned['Date'])
 # Set Date as index for time series analysis (if needed)
 data_cleaned = data_cleaned.set_index('Date')
 
-print("\nData cleaning complete. Cleaned data saved to 'cleaned_forex_data.csv'.")
+full_data = data_cleaned
+full_data.to_csv('full_data.csv')
 
 # Define training and testing periods
 # train_end = '2022-1-1'
@@ -49,4 +50,3 @@ print(cleaned_data.head())
 # Save train and test data
 cleaned_data.to_csv('cleaned_data.csv')
 
-cleaned_data.head()
