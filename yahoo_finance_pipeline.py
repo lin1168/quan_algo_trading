@@ -1,5 +1,5 @@
 import yfinance as yf
-import pandas as pd 
+import pandas as pd
 
 # Define the currency pair and the time period
 ticker = 'SPY'
@@ -15,8 +15,8 @@ print(data.head())  # Print the first few rows
 
 # Handling Missing Data
 print("\nMissing Values in Original Data:")
-print(data.isnull().sum()) # Check for missing values
-data_cleaned = data.dropna() # Drop rows with missing values
+print(data.isnull().sum())  # Check for missing values
+data_cleaned = data.dropna()  # Drop rows with missing values
 
 # Confirm the number of rows before and after cleaning
 print("\nRow Count Before Cleaning:")
@@ -49,4 +49,3 @@ print(cleaned_data.head())
 
 # Save train and test data
 cleaned_data.to_csv('cleaned_data.csv')
-
